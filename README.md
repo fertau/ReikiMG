@@ -29,8 +29,15 @@ Obra → Relevamiento → Unidad → Ambiente → Ítem → Medidas → Despiece
 
 ### 1. Proyecto de Supabase
 
-Crear un proyecto en [supabase.com](https://supabase.com) y ejecutar, desde el
-SQL Editor y **en orden**, los archivos de `supabase/migrations/`:
+Crear un proyecto en [supabase.com](https://supabase.com) y pegar
+`supabase/migraciones-completas.sql` en el SQL Editor. Es el concatenado de las
+cuatro primeras migraciones y **se puede ejecutar las veces que haga falta**:
+todo va con guardas de existencia, así que una corrida interrumpida se arregla
+volviendo a ejecutarlo.
+
+Después, editar el email en `0005_bootstrap_admin.sql` y correrlo aparte.
+
+Los archivos individuales, en `supabase/migrations/`:
 
 | Archivo | Qué hace |
 |---|---|
@@ -42,6 +49,10 @@ SQL Editor y **en orden**, los archivos de `supabase/migrations/`:
 
 Con la [CLI de Supabase](https://supabase.com/docs/guides/cli) alcanza con
 `supabase db push`.
+
+`supabase/reset.sql` borra todo lo que crean las migraciones. No hace falta para
+la instalación —las migraciones son reejecutables— pero sirve para vaciar un
+proyecto de prueba. Borra los datos.
 
 ### 2. Primer usuario
 
@@ -145,8 +156,10 @@ supabase/migrations/          Esquema, RLS, storage, catálogos y bootstrap
 ## Verificación
 
 - `npm run build` y `npm run typecheck` pasan sin errores ni warnings.
-- Las cinco migraciones se aplicaron contra PostgreSQL 16 y se corrió una batería
-  funcional sobre RLS y el flujo de aprobación: el medidor no crea obras ni se
+- Las migraciones se aplicaron contra PostgreSQL 16 sobre base virgen, sobre base
+  ya migrada y sobre base a medias, con el mismo resultado en los tres casos, y se
+  corrió una batería funcional sobre RLS y el flujo de aprobación: el medidor no
+  crea obras ni se
   autoaprueba, el relevamiento queda bloqueado durante la revisión, la devolución
   exige motivo, lo aprobado se congela salvo autorización explícita, producción lee
   pero no escribe, administración es sólo lectura y un medidor ajeno a la obra no

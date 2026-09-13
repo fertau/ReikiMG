@@ -154,6 +154,7 @@ begin
 end;
 $$;
 
+drop trigger if exists measurements_guard_transition on public.measurements;
 create trigger measurements_guard_transition
   before update on public.measurements
   for each row execute function public.measurements_guard_transition();
@@ -185,6 +186,7 @@ begin
 end;
 $$;
 
+drop trigger if exists measurements_sync_project_status on public.measurements;
 create trigger measurements_sync_project_status
   after insert or update of status on public.measurements
   for each row execute function public.measurements_sync_project_status();
@@ -219,15 +221,20 @@ alter table public.doc_counters          enable row level security;
 -- ---------------------------------------------------------------------
 -- Usuarios y roles
 -- ---------------------------------------------------------------------
+drop policy if exists users_select on public.users;
 create policy users_select on public.users
   for select to authenticated using (true);
+drop policy if exists users_update_self on public.users;
 create policy users_update_self on public.users
   for update to authenticated using (id = auth.uid()) with check (id = auth.uid());
+drop policy if exists users_admin_all on public.users;
 create policy users_admin_all on public.users
   for all to authenticated using (public.is_admin()) with check (public.is_admin());
 
+drop policy if exists user_roles_select on public.user_roles;
 create policy user_roles_select on public.user_roles
   for select to authenticated using (true);
+drop policy if exists user_roles_admin_all on public.user_roles;
 create policy user_roles_admin_all on public.user_roles
   for all to authenticated using (public.is_admin()) with check (public.is_admin());
 
@@ -241,8 +248,10 @@ begin
     'workflow_statuses', 'photo_categories', 'material_categories', 'materials',
     'product_families', 'product_types', 'product_fields'
   ] loop
+    execute format('drop policy if exists %1$s_select on public.%1$s', t);
     execute format(
       'create policy %1$s_select on public.%1$s for select to authenticated using (true)', t);
+    execute format('drop policy if exists %1$s_admin_all on public.%1$s', t);
     execute format(
       'create policy %1$s_admin_all on public.%1$s for all to authenticated
          using (public.is_admin()) with check (public.is_admin())', t);
@@ -253,33 +262,41 @@ $$;
 -- ---------------------------------------------------------------------
 -- Obras
 -- ---------------------------------------------------------------------
+drop policy if exists projects_select on public.projects;
 create policy projects_select on public.projects
   for select to authenticated using (public.project_is_readable(id));
+drop policy if exists projects_insert on public.projects;
 create policy projects_insert on public.projects
   for insert to authenticated
   with check (public.is_admin() or public.has_role('supervisor'));
+drop policy if exists projects_update on public.projects;
 create policy projects_update on public.projects
   for update to authenticated
   using (public.is_admin() or public.has_role('supervisor'))
   with check (public.is_admin() or public.has_role('supervisor'));
+drop policy if exists projects_delete on public.projects;
 create policy projects_delete on public.projects
   for delete to authenticated using (public.is_admin());
 
 -- ---------------------------------------------------------------------
 -- Estructura (unidades / ambientes)
 -- ---------------------------------------------------------------------
+drop policy if exists locations_select on public.locations;
 create policy locations_select on public.locations
   for select to authenticated using (public.project_is_readable(project_id));
+drop policy if exists locations_write on public.locations;
 create policy locations_write on public.locations
   for all to authenticated
   using (public.project_is_writable(project_id))
   with check (public.project_is_writable(project_id));
 
+drop policy if exists rooms_select on public.rooms;
 create policy rooms_select on public.rooms
   for select to authenticated using (
     exists (select 1 from public.locations l
              where l.id = location_id and public.project_is_readable(l.project_id))
   );
+drop policy if exists rooms_write on public.rooms;
 create policy rooms_write on public.rooms
   for all to authenticated
   using (exists (select 1 from public.locations l
@@ -290,8 +307,10 @@ create policy rooms_write on public.rooms
 -- ---------------------------------------------------------------------
 -- Relevamientos
 -- ---------------------------------------------------------------------
+drop policy if exists measurements_select on public.measurements;
 create policy measurements_select on public.measurements
   for select to authenticated using (public.measurement_is_readable(id));
+drop policy if exists measurements_insert on public.measurements;
 create policy measurements_insert on public.measurements
   for insert to authenticated
   with check (
@@ -299,6 +318,7 @@ create policy measurements_insert on public.measurements
     and public.project_is_readable(project_id)
   );
 -- El USING habilita la fila; el trigger valida qué transición puede hacer cada rol.
+drop policy if exists measurements_update on public.measurements;
 create policy measurements_update on public.measurements
   for update to authenticated
   using (
@@ -313,14 +333,17 @@ create policy measurements_update on public.measurements
     or (public.has_role('medidor')
         and (assigned_to = auth.uid() or created_by = auth.uid()))
   );
+drop policy if exists measurements_delete on public.measurements;
 create policy measurements_delete on public.measurements
   for delete to authenticated using (public.is_admin());
 
 -- ---------------------------------------------------------------------
 -- Ítems y contenido del relevamiento
 -- ---------------------------------------------------------------------
+drop policy if exists measurement_items_select on public.measurement_items;
 create policy measurement_items_select on public.measurement_items
   for select to authenticated using (public.measurement_is_readable(measurement_id));
+drop policy if exists measurement_items_write on public.measurement_items;
 create policy measurement_items_write on public.measurement_items
   for all to authenticated
   using (public.measurement_is_editable(measurement_id))
@@ -332,9 +355,11 @@ begin
   foreach t in array array[
     'item_field_values', 'item_photos', 'item_notes', 'item_audio', 'item_parts'
   ] loop
+    execute format('drop policy if exists %1$s_select on public.%1$s', t);
     execute format(
       'create policy %1$s_select on public.%1$s for select to authenticated
          using (public.item_is_readable(item_id))', t);
+    execute format('drop policy if exists %1$s_write on public.%1$s', t);
     execute format(
       'create policy %1$s_write on public.%1$s for all to authenticated
          using (public.item_is_editable(item_id))
@@ -346,10 +371,12 @@ $$;
 -- ---------------------------------------------------------------------
 -- Órdenes de producción
 -- ---------------------------------------------------------------------
+drop policy if exists production_orders_select on public.production_orders;
 create policy production_orders_select on public.production_orders
   for select to authenticated using (
     public.can_read_all() or public.is_production() or public.project_is_readable(project_id)
   );
+drop policy if exists production_orders_insert on public.production_orders;
 create policy production_orders_insert on public.production_orders
   for insert to authenticated
   with check (
@@ -357,13 +384,16 @@ create policy production_orders_insert on public.production_orders
     and exists (select 1 from public.measurements m
                  where m.id = measurement_id and m.status in ('aprobado', 'orden_generada'))
   );
+drop policy if exists production_orders_update on public.production_orders;
 create policy production_orders_update on public.production_orders
   for update to authenticated
   using (public.is_admin() or public.has_role('supervisor') or public.is_production())
   with check (public.is_admin() or public.has_role('supervisor') or public.is_production());
+drop policy if exists production_orders_delete on public.production_orders;
 create policy production_orders_delete on public.production_orders
   for delete to authenticated using (public.is_admin());
 
+drop policy if exists production_order_items_select on public.production_order_items;
 create policy production_order_items_select on public.production_order_items
   for select to authenticated using (
     exists (select 1 from public.production_orders o
@@ -371,21 +401,25 @@ create policy production_order_items_select on public.production_order_items
                and (public.can_read_all() or public.is_production()
                     or public.project_is_readable(o.project_id)))
   );
+drop policy if exists production_order_items_insert on public.production_order_items;
 create policy production_order_items_insert on public.production_order_items
   for insert to authenticated
   with check (public.is_admin() or public.has_role('supervisor'));
+drop policy if exists production_order_items_delete on public.production_order_items;
 create policy production_order_items_delete on public.production_order_items
   for delete to authenticated using (public.is_admin());
 
 -- ---------------------------------------------------------------------
 -- Historial: se escribe, no se edita ni se borra (sin policies de update/delete).
 -- ---------------------------------------------------------------------
+drop policy if exists workflow_history_select on public.workflow_history;
 create policy workflow_history_select on public.workflow_history
   for select to authenticated using (
     public.can_read_all()
     or (measurement_id is not null and public.measurement_is_readable(measurement_id))
     or (project_id is not null and public.project_is_readable(project_id))
   );
+drop policy if exists workflow_history_insert on public.workflow_history;
 create policy workflow_history_insert on public.workflow_history
   for insert to authenticated with check (actor_id = auth.uid());
 

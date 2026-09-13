@@ -12,34 +12,69 @@ create extension if not exists pg_trgm;
 -- Los estados del flujo son enums porque gobiernan permisos y
 -- transiciones. Las etiquetas visibles se editan desde workflow_statuses.
 -- ---------------------------------------------------------------------
-create type public.app_role as enum (
+do $$ begin
+  if not exists (select 1 from pg_type t join pg_namespace n on n.oid = t.typnamespace
+                 where n.nspname = 'public' and t.typname = 'app_role') then
+    create type public.app_role as enum (
   'admin', 'medidor', 'supervisor', 'produccion', 'administracion'
 );
+  end if;
+end $$;
 
-create type public.project_status as enum (
+do $$ begin
+  if not exists (select 1 from pg_type t join pg_namespace n on n.oid = t.typnamespace
+                 where n.nspname = 'public' and t.typname = 'project_status') then
+    create type public.project_status as enum (
   'pendiente', 'en_medicion', 'relevado', 'a_revisar',
   'corregir', 'aprobado', 'en_produccion', 'finalizado'
 );
+  end if;
+end $$;
 
-create type public.measurement_status as enum (
+do $$ begin
+  if not exists (select 1 from pg_type t join pg_namespace n on n.oid = t.typnamespace
+                 where n.nspname = 'public' and t.typname = 'measurement_status') then
+    create type public.measurement_status as enum (
   'en_curso', 'a_revisar', 'corregir', 'aprobado', 'orden_generada', 'anulado'
 );
+  end if;
+end $$;
 
-create type public.order_status as enum (
+do $$ begin
+  if not exists (select 1 from pg_type t join pg_namespace n on n.oid = t.typnamespace
+                 where n.nspname = 'public' and t.typname = 'order_status') then
+    create type public.order_status as enum (
   'generada', 'en_produccion', 'finalizada', 'anulada'
 );
+  end if;
+end $$;
 
-create type public.location_kind as enum (
+do $$ begin
+  if not exists (select 1 from pg_type t join pg_namespace n on n.oid = t.typnamespace
+                 where n.nspname = 'public' and t.typname = 'location_kind') then
+    create type public.location_kind as enum (
   'unidad', 'piso', 'departamento', 'sector', 'otro'
 );
+  end if;
+end $$;
 
-create type public.part_kind as enum (
+do $$ begin
+  if not exists (select 1 from pg_type t join pg_namespace n on n.oid = t.typnamespace
+                 where n.nspname = 'public' and t.typname = 'part_kind') then
+    create type public.part_kind as enum (
   'vidrio', 'perfileria', 'herraje', 'otro'
 );
+  end if;
+end $$;
 
-create type public.field_type as enum (
+do $$ begin
+  if not exists (select 1 from pg_type t join pg_namespace n on n.oid = t.typnamespace
+                 where n.nspname = 'public' and t.typname = 'field_type') then
+    create type public.field_type as enum (
   'text', 'textarea', 'number', 'select', 'multiselect', 'boolean', 'catalog'
 );
+  end if;
+end $$;
 
 -- ---------------------------------------------------------------------
 -- Utilidades
@@ -52,7 +87,7 @@ begin
 end;
 $$;
 
-create table public.doc_counters (
+create table if not exists public.doc_counters (
   scope       text    not null,
   year        integer not null,
   last_value  integer not null default 0,
@@ -81,7 +116,7 @@ $$;
 -- ---------------------------------------------------------------------
 -- Usuarios y roles
 -- ---------------------------------------------------------------------
-create table public.users (
+create table if not exists public.users (
   id          uuid primary key references auth.users (id) on delete cascade,
   email       text not null,
   full_name   text,
@@ -90,11 +125,12 @@ create table public.users (
   created_at  timestamptz not null default now(),
   updated_at  timestamptz not null default now()
 );
-create unique index users_email_key on public.users (lower(email));
+create unique index if not exists users_email_key on public.users (lower(email));
+drop trigger if exists users_updated_at on public.users;
 create trigger users_updated_at before update on public.users
   for each row execute function public.set_updated_at();
 
-create table public.user_roles (
+create table if not exists public.user_roles (
   id          uuid primary key default gen_random_uuid(),
   user_id     uuid not null references public.users (id) on delete cascade,
   role        public.app_role not null,
@@ -102,7 +138,7 @@ create table public.user_roles (
   created_by  uuid references public.users (id),
   unique (user_id, role)
 );
-create index user_roles_user_id_idx on public.user_roles (user_id);
+create index if not exists user_roles_user_id_idx on public.user_roles (user_id);
 
 -- Alta automática del perfil al crearse el usuario en auth.
 create or replace function public.handle_new_auth_user()
@@ -127,6 +163,7 @@ begin
 end;
 $$;
 
+drop trigger if exists on_auth_user_created on auth.users;
 create trigger on_auth_user_created
   after insert on auth.users
   for each row execute function public.handle_new_auth_user();
@@ -134,7 +171,7 @@ create trigger on_auth_user_created
 -- ---------------------------------------------------------------------
 -- Catálogos editables desde administración
 -- ---------------------------------------------------------------------
-create table public.workflow_statuses (
+create table if not exists public.workflow_statuses (
   id          uuid primary key default gen_random_uuid(),
   scope       text not null check (scope in ('project', 'measurement', 'order')),
   code        text not null,
@@ -146,10 +183,11 @@ create table public.workflow_statuses (
   updated_at  timestamptz not null default now(),
   unique (scope, code)
 );
+drop trigger if exists workflow_statuses_updated_at on public.workflow_statuses;
 create trigger workflow_statuses_updated_at before update on public.workflow_statuses
   for each row execute function public.set_updated_at();
 
-create table public.photo_categories (
+create table if not exists public.photo_categories (
   id          uuid primary key default gen_random_uuid(),
   code        text not null unique,
   label       text not null,
@@ -158,12 +196,13 @@ create table public.photo_categories (
   created_at  timestamptz not null default now(),
   updated_at  timestamptz not null default now()
 );
+drop trigger if exists photo_categories_updated_at on public.photo_categories;
 create trigger photo_categories_updated_at before update on public.photo_categories
   for each row execute function public.set_updated_at();
 
 -- material_categories agrupa todos los catálogos de materiales:
 -- tipos de vidrio, espesores, colores, terminaciones, perfilería, herrajes, etc.
-create table public.material_categories (
+create table if not exists public.material_categories (
   id          uuid primary key default gen_random_uuid(),
   key         text not null unique,
   name        text not null,
@@ -173,10 +212,11 @@ create table public.material_categories (
   created_at  timestamptz not null default now(),
   updated_at  timestamptz not null default now()
 );
+drop trigger if exists material_categories_updated_at on public.material_categories;
 create trigger material_categories_updated_at before update on public.material_categories
   for each row execute function public.set_updated_at();
 
-create table public.materials (
+create table if not exists public.materials (
   id           uuid primary key default gen_random_uuid(),
   category_id  uuid not null references public.material_categories (id) on delete cascade,
   code         text,
@@ -187,16 +227,17 @@ create table public.materials (
   created_at   timestamptz not null default now(),
   updated_at   timestamptz not null default now()
 );
-create unique index materials_category_code_key
+create unique index if not exists materials_category_code_key
   on public.materials (category_id, code) where code is not null;
-create index materials_category_idx on public.materials (category_id) where is_active;
+create index if not exists materials_category_idx on public.materials (category_id) where is_active;
+drop trigger if exists materials_updated_at on public.materials;
 create trigger materials_updated_at before update on public.materials
   for each row execute function public.set_updated_at();
 
 -- ---------------------------------------------------------------------
 -- Productos y campos dinámicos
 -- ---------------------------------------------------------------------
-create table public.product_families (
+create table if not exists public.product_families (
   id          uuid primary key default gen_random_uuid(),
   code        text not null unique,
   name        text not null,
@@ -206,10 +247,11 @@ create table public.product_families (
   created_at  timestamptz not null default now(),
   updated_at  timestamptz not null default now()
 );
+drop trigger if exists product_families_updated_at on public.product_families;
 create trigger product_families_updated_at before update on public.product_families
   for each row execute function public.set_updated_at();
 
-create table public.product_types (
+create table if not exists public.product_types (
   id           uuid primary key default gen_random_uuid(),
   family_id    uuid not null references public.product_families (id) on delete restrict,
   code         text not null unique,
@@ -221,12 +263,13 @@ create table public.product_types (
   created_at   timestamptz not null default now(),
   updated_at   timestamptz not null default now()
 );
-create index product_types_family_idx on public.product_types (family_id) where is_active;
+create index if not exists product_types_family_idx on public.product_types (family_id) where is_active;
+drop trigger if exists product_types_updated_at on public.product_types;
 create trigger product_types_updated_at before update on public.product_types
   for each row execute function public.set_updated_at();
 
 -- Definición de los campos que se muestran al cargar un ítem de este producto.
-create table public.product_fields (
+create table if not exists public.product_fields (
   id               uuid primary key default gen_random_uuid(),
   product_type_id  uuid not null references public.product_types (id) on delete cascade,
   field_key        text not null,
@@ -245,14 +288,15 @@ create table public.product_fields (
   updated_at       timestamptz not null default now(),
   unique (product_type_id, field_key)
 );
-create index product_fields_type_idx on public.product_fields (product_type_id) where is_active;
+create index if not exists product_fields_type_idx on public.product_fields (product_type_id) where is_active;
+drop trigger if exists product_fields_updated_at on public.product_fields;
 create trigger product_fields_updated_at before update on public.product_fields
   for each row execute function public.set_updated_at();
 
 -- ---------------------------------------------------------------------
 -- Obras
 -- ---------------------------------------------------------------------
-create table public.projects (
+create table if not exists public.projects (
   id             uuid primary key default gen_random_uuid(),
   code           text unique,
   client_name    text not null,
@@ -272,9 +316,9 @@ create table public.projects (
     || ' ' || coalesce(contact_name, '')
   ) stored
 );
-create index projects_search_idx on public.projects using gin (search_text gin_trgm_ops);
-create index projects_status_idx on public.projects (status);
-create index projects_assigned_idx on public.projects (assigned_to);
+create index if not exists projects_search_idx on public.projects using gin (search_text gin_trgm_ops);
+create index if not exists projects_status_idx on public.projects (status);
+create index if not exists projects_assigned_idx on public.projects (assigned_to);
 
 create or replace function public.projects_set_code()
 returns trigger language plpgsql security definer set search_path = public as $$
@@ -285,8 +329,10 @@ begin
   return new;
 end;
 $$;
+drop trigger if exists projects_set_code on public.projects;
 create trigger projects_set_code before insert on public.projects
   for each row execute function public.projects_set_code();
+drop trigger if exists projects_updated_at on public.projects;
 create trigger projects_updated_at before update on public.projects
   for each row execute function public.set_updated_at();
 
@@ -294,7 +340,7 @@ create trigger projects_updated_at before update on public.projects
 -- Estructura física de la obra: Unidad/Sector -> Ambiente
 -- Se define a nivel obra para poder reutilizarla entre relevamientos.
 -- ---------------------------------------------------------------------
-create table public.locations (
+create table if not exists public.locations (
   id          uuid primary key default gen_random_uuid(),
   project_id  uuid not null references public.projects (id) on delete cascade,
   kind        public.location_kind not null default 'unidad',
@@ -306,11 +352,12 @@ create table public.locations (
   updated_at  timestamptz not null default now(),
   created_by  uuid references public.users (id) default auth.uid()
 );
-create index locations_project_idx on public.locations (project_id);
+create index if not exists locations_project_idx on public.locations (project_id);
+drop trigger if exists locations_updated_at on public.locations;
 create trigger locations_updated_at before update on public.locations
   for each row execute function public.set_updated_at();
 
-create table public.rooms (
+create table if not exists public.rooms (
   id           uuid primary key default gen_random_uuid(),
   location_id  uuid not null references public.locations (id) on delete cascade,
   name         text not null,
@@ -320,14 +367,15 @@ create table public.rooms (
   updated_at   timestamptz not null default now(),
   created_by   uuid references public.users (id) default auth.uid()
 );
-create index rooms_location_idx on public.rooms (location_id);
+create index if not exists rooms_location_idx on public.rooms (location_id);
+drop trigger if exists rooms_updated_at on public.rooms;
 create trigger rooms_updated_at before update on public.rooms
   for each row execute function public.set_updated_at();
 
 -- ---------------------------------------------------------------------
 -- Relevamientos
 -- ---------------------------------------------------------------------
-create table public.measurements (
+create table if not exists public.measurements (
   id                uuid primary key default gen_random_uuid(),
   project_id        uuid not null references public.projects (id) on delete cascade,
   code              text unique,
@@ -346,9 +394,9 @@ create table public.measurements (
   updated_at        timestamptz not null default now(),
   created_by        uuid references public.users (id) default auth.uid()
 );
-create index measurements_project_idx on public.measurements (project_id);
-create index measurements_status_idx on public.measurements (status);
-create index measurements_assigned_idx on public.measurements (assigned_to);
+create index if not exists measurements_project_idx on public.measurements (project_id);
+create index if not exists measurements_status_idx on public.measurements (status);
+create index if not exists measurements_assigned_idx on public.measurements (assigned_to);
 
 create or replace function public.measurements_set_code()
 returns trigger language plpgsql security definer set search_path = public as $$
@@ -362,15 +410,17 @@ begin
   return new;
 end;
 $$;
+drop trigger if exists measurements_set_code on public.measurements;
 create trigger measurements_set_code before insert on public.measurements
   for each row execute function public.measurements_set_code();
+drop trigger if exists measurements_updated_at on public.measurements;
 create trigger measurements_updated_at before update on public.measurements
   for each row execute function public.set_updated_at();
 
 -- ---------------------------------------------------------------------
 -- Ítems / productos medidos
 -- ---------------------------------------------------------------------
-create table public.measurement_items (
+create table if not exists public.measurement_items (
   id               uuid primary key default gen_random_uuid(),
   measurement_id   uuid not null references public.measurements (id) on delete cascade,
   room_id          uuid not null references public.rooms (id) on delete restrict,
@@ -386,12 +436,13 @@ create table public.measurement_items (
   updated_at       timestamptz not null default now(),
   created_by       uuid references public.users (id) default auth.uid()
 );
-create index measurement_items_measurement_idx on public.measurement_items (measurement_id);
-create index measurement_items_room_idx on public.measurement_items (room_id);
+create index if not exists measurement_items_measurement_idx on public.measurement_items (measurement_id);
+create index if not exists measurement_items_room_idx on public.measurement_items (room_id);
+drop trigger if exists measurement_items_updated_at on public.measurement_items;
 create trigger measurement_items_updated_at before update on public.measurement_items
   for each row execute function public.set_updated_at();
 
-create table public.item_field_values (
+create table if not exists public.item_field_values (
   id          uuid primary key default gen_random_uuid(),
   item_id     uuid not null references public.measurement_items (id) on delete cascade,
   field_id    uuid not null references public.product_fields (id) on delete cascade,
@@ -401,11 +452,12 @@ create table public.item_field_values (
   updated_at  timestamptz not null default now(),
   unique (item_id, field_id)
 );
-create index item_field_values_item_idx on public.item_field_values (item_id);
+create index if not exists item_field_values_item_idx on public.item_field_values (item_id);
+drop trigger if exists item_field_values_updated_at on public.item_field_values;
 create trigger item_field_values_updated_at before update on public.item_field_values
   for each row execute function public.set_updated_at();
 
-create table public.item_photos (
+create table if not exists public.item_photos (
   id            uuid primary key default gen_random_uuid(),
   item_id       uuid not null references public.measurement_items (id) on delete cascade,
   storage_path  text not null unique,
@@ -417,9 +469,9 @@ create table public.item_photos (
   created_at    timestamptz not null default now(),
   created_by    uuid references public.users (id) default auth.uid()
 );
-create index item_photos_item_idx on public.item_photos (item_id);
+create index if not exists item_photos_item_idx on public.item_photos (item_id);
 
-create table public.item_notes (
+create table if not exists public.item_notes (
   id          uuid primary key default gen_random_uuid(),
   item_id     uuid not null references public.measurement_items (id) on delete cascade,
   body        text not null check (length(btrim(body)) > 0),
@@ -427,11 +479,12 @@ create table public.item_notes (
   updated_at  timestamptz not null default now(),
   created_by  uuid references public.users (id) default auth.uid()
 );
-create index item_notes_item_idx on public.item_notes (item_id);
+create index if not exists item_notes_item_idx on public.item_notes (item_id);
+drop trigger if exists item_notes_updated_at on public.item_notes;
 create trigger item_notes_updated_at before update on public.item_notes
   for each row execute function public.set_updated_at();
 
-create table public.item_audio (
+create table if not exists public.item_audio (
   id                uuid primary key default gen_random_uuid(),
   item_id           uuid not null references public.measurement_items (id) on delete cascade,
   storage_path      text not null unique,
@@ -445,12 +498,12 @@ create table public.item_audio (
   created_at        timestamptz not null default now(),
   created_by        uuid references public.users (id) default auth.uid()
 );
-create index item_audio_item_idx on public.item_audio (item_id);
+create index if not exists item_audio_item_idx on public.item_audio (item_id);
 
 -- ---------------------------------------------------------------------
 -- Despiece
 -- ---------------------------------------------------------------------
-create table public.item_parts (
+create table if not exists public.item_parts (
   id           uuid primary key default gen_random_uuid(),
   item_id      uuid not null references public.measurement_items (id) on delete cascade,
   kind         public.part_kind not null,
@@ -471,14 +524,15 @@ create table public.item_parts (
   updated_at   timestamptz not null default now(),
   created_by   uuid references public.users (id) default auth.uid()
 );
-create index item_parts_item_idx on public.item_parts (item_id, kind);
+create index if not exists item_parts_item_idx on public.item_parts (item_id, kind);
+drop trigger if exists item_parts_updated_at on public.item_parts;
 create trigger item_parts_updated_at before update on public.item_parts
   for each row execute function public.set_updated_at();
 
 -- ---------------------------------------------------------------------
 -- Órdenes de producción
 -- ---------------------------------------------------------------------
-create table public.production_orders (
+create table if not exists public.production_orders (
   id              uuid primary key default gen_random_uuid(),
   number          text unique,
   measurement_id  uuid not null references public.measurements (id) on delete restrict,
@@ -491,8 +545,8 @@ create table public.production_orders (
   updated_at      timestamptz not null default now(),
   created_by      uuid references public.users (id) default auth.uid()
 );
-create index production_orders_project_idx on public.production_orders (project_id);
-create index production_orders_status_idx on public.production_orders (status);
+create index if not exists production_orders_project_idx on public.production_orders (project_id);
+create index if not exists production_orders_status_idx on public.production_orders (status);
 
 create or replace function public.production_orders_set_number()
 returns trigger language plpgsql security definer set search_path = public as $$
@@ -503,14 +557,16 @@ begin
   return new;
 end;
 $$;
+drop trigger if exists production_orders_set_number on public.production_orders;
 create trigger production_orders_set_number before insert on public.production_orders
   for each row execute function public.production_orders_set_number();
+drop trigger if exists production_orders_updated_at on public.production_orders;
 create trigger production_orders_updated_at before update on public.production_orders
   for each row execute function public.set_updated_at();
 
 -- El snapshot congela el ítem al momento de emitir la orden: lo que produce
 -- taller no cambia aunque después se autorice editar el relevamiento.
-create table public.production_order_items (
+create table if not exists public.production_order_items (
   id          uuid primary key default gen_random_uuid(),
   order_id    uuid not null references public.production_orders (id) on delete cascade,
   item_id     uuid references public.measurement_items (id) on delete set null,
@@ -518,12 +574,12 @@ create table public.production_order_items (
   snapshot    jsonb not null,
   created_at  timestamptz not null default now()
 );
-create index production_order_items_order_idx on public.production_order_items (order_id);
+create index if not exists production_order_items_order_idx on public.production_order_items (order_id);
 
 -- ---------------------------------------------------------------------
 -- Historial / auditoría
 -- ---------------------------------------------------------------------
-create table public.workflow_history (
+create table if not exists public.workflow_history (
   id              uuid primary key default gen_random_uuid(),
   entity_type     text not null,
   entity_id       uuid,
@@ -535,5 +591,5 @@ create table public.workflow_history (
   actor_id        uuid references public.users (id) default auth.uid(),
   created_at      timestamptz not null default now()
 );
-create index workflow_history_measurement_idx on public.workflow_history (measurement_id, created_at desc);
-create index workflow_history_project_idx on public.workflow_history (project_id, created_at desc);
+create index if not exists workflow_history_measurement_idx on public.workflow_history (measurement_id, created_at desc);
+create index if not exists workflow_history_project_idx on public.workflow_history (project_id, created_at desc);

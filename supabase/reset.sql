@@ -14,14 +14,17 @@
 -- 1. Trigger sobre auth.users (vive fuera del esquema public)
 drop trigger if exists on_auth_user_created on auth.users;
 
--- 2. Políticas y archivos de Storage
+-- 2. Políticas de Storage
+--
+-- Sólo se quitan las políticas. Los buckets NO se borran acá: Supabase
+-- bloquea el DELETE directo sobre storage.buckets y storage.objects
+-- (trigger storage.protect_delete), y hay que usar la Storage API o el
+-- panel. Tampoco hace falta: 0003 los recrea con ON CONFLICT DO UPDATE,
+-- así que un bucket ya existente se actualiza en lugar de fallar.
 drop policy if exists "reikimg_media_select" on storage.objects;
 drop policy if exists "reikimg_media_insert" on storage.objects;
 drop policy if exists "reikimg_media_update" on storage.objects;
 drop policy if exists "reikimg_media_delete" on storage.objects;
-
-delete from storage.objects where bucket_id in ('item-photos', 'item-audio');
-delete from storage.buckets where id in ('item-photos', 'item-audio');
 
 -- 3. Tablas (cascade arrastra índices, triggers y claves foráneas)
 drop table if exists public.workflow_history        cascade;
@@ -80,7 +83,7 @@ drop type if exists public.measurement_status  cascade;
 drop type if exists public.project_status      cascade;
 drop type if exists public.app_role            cascade;
 
--- Verificación: las cuatro columnas tienen que dar 0.
+-- Verificación: las tres columnas tienen que dar 0.
 select
   (select count(*) from pg_tables
      where schemaname = 'public'
@@ -89,5 +92,4 @@ select
      where n.nspname = 'public'
        and t.typname in ('app_role','project_status','measurement_status'))      as tipos,
   (select count(*) from pg_policies where schemaname = 'storage'
-     and policyname like 'reikimg%')                                             as politicas_storage,
-  (select count(*) from storage.buckets where id in ('item-photos','item-audio')) as buckets;
+     and policyname like 'reikimg%')                                             as politicas_storage;
