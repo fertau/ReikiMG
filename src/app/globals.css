@@ -1,0 +1,146 @@
+@import 'tailwindcss';
+
+@theme {
+  --color-brand-50: #eff6ff;
+  --color-brand-100: #dbeafe;
+  --color-brand-200: #bfdbfe;
+  --color-brand-300: #93c5fd;
+  --color-brand-400: #60a5fa;
+  --color-brand-500: #3b82f6;
+  --color-brand-600: #2563eb;
+  --color-brand-700: #1d4ed8;
+  --color-brand-800: #1e40af;
+  --color-brand-900: #1e3a8a;
+
+  --color-ink: #0f172a;
+  --color-muted: #64748b;
+  --color-surface: #ffffff;
+  --color-canvas: #f1f5f9;
+
+  --font-sans: system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', sans-serif;
+}
+
+@layer base {
+  html {
+    -webkit-text-size-adjust: 100%;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  body {
+    background-color: var(--color-canvas);
+    color: var(--color-ink);
+    font-family: var(--font-sans);
+    overscroll-behavior-y: none;
+  }
+
+  /* 16px evita el zoom automático de iOS al enfocar un campo. */
+  input,
+  select,
+  textarea {
+    font-size: 16px;
+  }
+
+  h1, h2, h3 {
+    text-wrap: balance;
+  }
+}
+
+@utility btn {
+  display: inline-flex;
+  min-height: calc(var(--spacing) * 12);
+  align-items: center;
+  justify-content: center;
+  gap: calc(var(--spacing) * 2);
+  border-radius: var(--radius-xl);
+  padding-inline: calc(var(--spacing) * 4);
+  font-size: var(--text-base);
+  font-weight: 600;
+  transition-property: color, background-color, border-color, box-shadow, transform;
+  transition-duration: 150ms;
+
+  &:active {
+    scale: 0.98;
+  }
+
+  &:disabled {
+    pointer-events: none;
+    opacity: 0.5;
+  }
+}
+
+@layer components {
+  .card {
+    @apply rounded-2xl bg-white shadow-sm ring-1 ring-slate-200;
+  }
+
+  .card-pad {
+    @apply rounded-2xl bg-white p-4 shadow-sm ring-1 ring-slate-200;
+  }
+
+  .btn-primary {
+    @apply btn bg-brand-600 text-white shadow-sm hover:bg-brand-700;
+  }
+
+  .btn-secondary {
+    @apply btn bg-white text-slate-700 ring-1 ring-slate-300 hover:bg-slate-50;
+  }
+
+  .btn-danger {
+    @apply btn bg-red-600 text-white hover:bg-red-700;
+  }
+
+  .btn-success {
+    @apply btn bg-emerald-600 text-white hover:bg-emerald-700;
+  }
+
+  .btn-ghost {
+    @apply btn bg-transparent text-slate-600 hover:bg-slate-100;
+  }
+
+  .btn-sm {
+    @apply min-h-9 rounded-lg px-3 text-sm;
+  }
+
+  .label {
+    @apply mb-1.5 block text-sm font-medium text-slate-700;
+  }
+
+  .input {
+    @apply block w-full rounded-xl border-0 bg-white px-3.5 py-3 text-ink shadow-sm
+           ring-1 ring-slate-300 outline-none placeholder:text-slate-400
+           focus:ring-2 focus:ring-brand-600;
+  }
+
+  .field-error {
+    @apply mt-1 text-sm font-medium text-red-600;
+  }
+
+  .chip {
+    @apply inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs
+           font-semibold ring-1 ring-inset whitespace-nowrap;
+  }
+
+  .section-title {
+    @apply text-xs font-bold tracking-wide text-slate-500 uppercase;
+  }
+
+  .list-row {
+    @apply flex min-h-14 w-full items-center gap-3 px-4 py-3 text-left
+           transition active:bg-slate-50;
+  }
+
+  .safe-bottom {
+    padding-bottom: calc(env(safe-area-inset-bottom, 0px));
+  }
+}
+
+/* Ocultar el shell de la app en las vistas de impresión. */
+@media print {
+  .no-print {
+    display: none !important;
+  }
+
+  body {
+    background: #fff;
+  }
+}
